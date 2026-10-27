@@ -1,0 +1,81 @@
+---
+title: "Quarterly retail sales"
+---
+
+::: {.callout-note}
+This report was generated using AI under general human direction. At the time of generation, the contents have not been comprehensively reviewed by a human analyst.
+
+<!--
+To indicate human review: Delete the line above about contents not being reviewed, and replace this comment with:
+The contents have been reviewed and validated by [Your Name], [Your Role] on [Date].
+-->
+:::
+
+# Introduction
+
+This report totals retail sales by calendar quarter from `data/retail_sales.xlsx`. It shows the totals as a table and as a bar chart with a line over the same values.
+
+# Setup
+
+```{r}
+#| label: load-packages
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(gt)
+library(ggplot2)
+library(scales)
+```
+
+```{r}
+#| label: load-data
+sales <- read_excel("data/retail_sales.xlsx")
+```
+
+The data has `{r} format(nrow(sales), big.mark = ",")` rows.
+
+# Quarterly totals
+
+`order_date` is converted to a `Date`. Sales are then summed by calendar quarter, with the year included so that the same quarter in different years stays separate.
+
+```{r}
+#| label: aggregate-quarterly
+quarterly <- sales |>
+       mutate(
+              order_date = as.Date(order_date),
+              quarter = floor_date(order_date, "quarter")
+       ) |>
+       summarise(total_sales = sum(sales, na.rm = TRUE), .by = quarter) |>
+       arrange(quarter) |>
+       mutate(label = paste0(year(quarter), " Q", quarter(quarter)))
+```
+
+The data covers `{r} nrow(quarterly)` quarters, from `{r} quarterly$label[1]` to `{r} quarterly$label[nrow(quarterly)]`.
+
+```{r}
+#| label: quarterly-table
+quarterly |>
+  select(label, total_sales) |>
+  gt() |>
+  cols_label(label = "Quarter", total_sales = "Total sales") |>
+  fmt_currency(total_sales, decimals = 0) |>
+  tab_header(title = "Quarterly retail sales")
+```
+
+# Quarterly sales chart
+
+```{r}
+#| label: quarterly-plot
+ggplot(quarterly, aes(x = label, y = total_sales, group = 1)) +
+  geom_col() +
+  geom_line() +
+  scale_y_continuous(labels = label_dollar()) +
+  labs(x = "Quarter", y = "Total sales", title = "Quarterly retail sales") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+In the chart, Q4 is the highest quarter in each year and Q1 is the lowest or close to it. Sales are higher overall in 2018 than in 2015.
+
+# Notes
+
+- Some order IDs appear on more than one row. These look like separate line items, so all rows are summed as they are. The data was not checked for exact duplicate rows.
